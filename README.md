@@ -154,14 +154,12 @@ ai-collision-check/
 │   └── idea-log.md                 # 想法日志模板（误杀率的数据采集工具）
 ├── tests/
 │   └── test_offline.py             # 离线端到端测试（不联网、不需要 key）
-├── docs/                           # 背景文档（工作笔记性质）
-│   ├── literature-map.md           # 20+ 篇已验证文献的领域地图
-│   ├── research-routes.md          # 三条可执行研究路线 + 撞车分析
-│   ├── meta-research-idea-collision.md  # 「想法撞车」元研究方案
-│   ├── mechanisms-timestamp-privacy.md  # 时间戳 / 防御性发表 / 隐私匹配机制
-│   └── product-design.md           # 如果把这件事做成产品，设计要点
-└── essay/
-    └── collision-four-truths.md    # 缘起（一篇公众号文章）
+└── docs/                           # 背景文档（工作笔记性质）
+    ├── literature-map.md           # 20+ 篇已验证文献的领域地图
+    ├── research-routes.md          # 三条可执行研究路线 + 撞车分析
+    ├── meta-research-idea-collision.md  # 「想法撞车」元研究方案
+    ├── mechanisms-timestamp-privacy.md  # 时间戳 / 防御性发表 / 隐私匹配机制
+    └── product-design.md           # 如果把这件事做成产品，设计要点
 ```
 
 ---
