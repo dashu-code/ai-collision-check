@@ -1,0 +1,28 @@
+# 报告输出目录（你的撞车检查结果，属于你的研究数据）
+reports/
+
+# 想法日志的私有副本
+idea-log.local.md
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# 环境变量 / 密钥
+.env
+.env.*
+*.key
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# 临时文件
+*.tmp
+*.bak
+~$*
