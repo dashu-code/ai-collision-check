@@ -152,6 +152,8 @@ ai-collision-check/
 │       └── criteria.md             # 三栏判定的详细判据
 ├── templates/
 │   └── idea-log.md                 # 想法日志模板（误杀率的数据采集工具）
+├── tests/
+│   └── test_offline.py             # 离线端到端测试（不联网、不需要 key）
 ├── docs/                           # 背景文档（工作笔记性质）
 │   ├── literature-map.md           # 20+ 篇已验证文献的领域地图
 │   ├── research-routes.md          # 三条可执行研究路线 + 撞车分析
@@ -161,6 +163,18 @@ ai-collision-check/
 └── essay/
     └── collision-four-truths.md    # 缘起（一篇公众号文章）
 ```
+
+---
+
+## 测试
+
+```bash
+python tests/test_offline.py
+```
+
+离线端到端测试：把 LLM 和检索都 mock 掉，跑通完整的四步流程，然后对生成的报告做 13 项断言——包括三栏判定是否齐全、`evidence_ids` 下标越界是否被安全忽略、标题里的方括号是否会破坏 markdown 链接、回访日期是否正确算成 +90 天。
+
+**不联网、不需要 API key。** 改完代码先跑它。
 
 ---
 

@@ -1,6 +1,9 @@
 # 报告输出目录（你的撞车检查结果，属于你的研究数据）
 reports/
 
+# 测试产物
+tests/_out/
+
 # 想法日志的私有副本
 idea-log.local.md
 

@@ -74,12 +74,16 @@ def log(msg):
 
 def arxiv_search(query, max_results=8, since=None):
     """arXiv Atom API。不需要 key。"""
-    q = f'all:"{query}"'
+    # 检索式里带引号会破坏 arXiv 的查询语法，先清掉
+    safe = " ".join(query.replace('"', " ").split())
+    q = f'all:"{safe}"'
+    # 按年份过滤时先多取一些，否则筛完可能一条不剩
+    fetch_n = max_results * 3 if since else max_results
     url = (
         "http://export.arxiv.org/api/query?"
         + urllib.parse.urlencode(
             {"search_query": q, "start": 0,
-             "max_results": max_results, "sortBy": "relevance"}
+             "max_results": fetch_n, "sortBy": "relevance"}
         )
     )
     ns = {"a": "http://www.w3.org/2005/Atom"}
@@ -97,6 +101,8 @@ def arxiv_search(query, max_results=8, since=None):
             "url": e.findtext("a:id", "", ns),
             "abstract": " ".join((e.findtext("a:summary", "", ns) or "").split())[:900],
         })
+        if len(out) >= max_results:
+            break
     return out
 
 
@@ -317,9 +323,16 @@ def differentiate(direction, claims, assessments):
 
 # ---------------------------------------------------------------- 报告
 
-def render(direction, claims, evidence, assessments, diff, since, used_llm):
+def md_link(title, url):
+    """标题里的方括号会破坏 markdown 链接语法，做最小转义。"""
+    t = (title or "(无标题)").replace("[", "\\[").replace("]", "\\]")
+    return f"[{t}]({url})" if url else t
+
+
+def render(direction, claims, evidence, assessments, diff, since, used_llm,
+           per_query=None):
     now = datetime.now()
-    rid = f"CC-{now:%Y%m%d-%H%M}"
+    rid = f"CC-{now:%Y%m%d-%H%M%S}"
     L = [f"# 撞车检测报告 {rid}", "",
          f"生成时间：{now:%Y-%m-%d %H:%M}　|　文献窗口：{since or '不限'} 年至今　|　"
          f"LLM 判定：{'开启' if used_llm else '关闭（仅检索）'}", "",
@@ -347,7 +360,7 @@ def render(direction, claims, evidence, assessments, diff, since, used_llm):
                 for i in ids:
                     if isinstance(i, int) and 1 <= i <= len(ev):
                         h = ev[i - 1]
-                        L.append(f"  - [{h['title']}]({h.get('url','')}) "
+                        L.append(f"  - {md_link(h['title'], h.get('url',''))} "
                                  f"({h.get('year','?')}, {h.get('source','')})")
                 L.append("")
 
@@ -356,8 +369,8 @@ def render(direction, claims, evidence, assessments, diff, since, used_llm):
               f"- 主要落点：主张 {diff.get('anchor_claim','?')}",
               f"- 整体风险：**{diff.get('risk','?')}** —— {diff.get('risk_note','')}", "",
               "下一步："]
-        for s in diff.get("next_steps", []) or ["（未生成）"]:
-            L.append(f"1. {s}")
+        for i, s in enumerate(diff.get("next_steps", []) or ["（未生成）"], 1):
+            L.append(f"{i}. {s}")
         L.append("")
     else:
         L += ["## 检索结果（未做判定）", ""]
@@ -367,7 +380,7 @@ def render(direction, claims, evidence, assessments, diff, since, used_llm):
             L.append(f"检索式：{qs}")
             L.append("")
             for h in evidence.get(c.get("id"), []):
-                L.append(f"- [{h['title']}]({h.get('url','')}) "
+                L.append(f"- {md_link(h['title'], h.get('url',''))} "
                          f"({h.get('year','?')}, {h.get('source','')})")
             L.append("")
 
@@ -382,9 +395,15 @@ def render(direction, claims, evidence, assessments, diff, since, used_llm):
           f"{(now + timedelta(days=90)):%Y-%m-%d} | | |", "",
           "## 五、检索记录（复现用）", ""]
     for c in (claims or []):
-        for q in c.get("queries", []):
-            n = len(evidence.get(c.get("id"), []))
-            L.append(f"- 主张 {c.get('id')} `{q}` → {n} 条")
+        cid = c.get("id")
+        counts = (per_query or {}).get(cid)
+        if counts:
+            for q, n in counts:
+                L.append(f"- 主张 {cid} `{q}` → {n} 条")
+        else:
+            for q in c.get("queries", []):
+                L.append(f"- 主张 {cid} `{q}` → 未执行检索")
+        L.append(f"- 主张 {cid} 去重后合计 **{len(evidence.get(cid, []))}** 条")
     L.append("")
     return rid, "\n".join(L)
 
@@ -436,13 +455,14 @@ def main():
                 "（这两个源以英文为主）")
 
     log("步骤 2：多路检索 …")
-    evidence, all_hits = {}, {}
+    evidence, per_query = {}, {}
     for c in claims:
         cid = c.get("id")
-        bucket = []
+        bucket, counts = [], []
         for q in c.get("queries", [])[:2]:
             hits = retrieve(q, args.per_source, args.since)
             log(f"  - 主张 {cid} `{q[:48]}…` → {len(hits)} 条")
+            counts.append((q, len(hits)))
             bucket.extend(hits)
         # 去重
         seen, uniq = set(), []
@@ -452,7 +472,7 @@ def main():
                 seen.add(k)
                 uniq.append(h)
         evidence[cid] = uniq
-        all_hits[cid] = uniq
+        per_query[cid] = counts
 
     assessments, diff = [], {}
     if used_llm:
@@ -474,7 +494,7 @@ def main():
             log(f"  ! 差异化假设生成失败：{e}")
 
     rid, text = render(direction, claims, evidence, assessments, diff,
-                       args.since, used_llm)
+                       args.since, used_llm, per_query)
     outdir = Path(args.outdir)
     outdir.mkdir(parents=True, exist_ok=True)
     path = outdir / f"{rid}.md"
